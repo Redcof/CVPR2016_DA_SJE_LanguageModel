@@ -76,6 +76,7 @@ if opt.gpuid >= 0 then
     end
 end
 
+
 local loader = MultimodalMinibatchLoader.create(
     opt.data_dir, opt.nclass, opt.image_dim, opt.doc_length,
     opt.batch_size, opt.randomize_pair, opt.ids_file, opt.num_caption,

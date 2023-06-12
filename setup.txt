@@ -1,0 +1,8 @@
+# WINDOWS 
+Installing LUAROCK 3.8.0 for LUA 5.3 
+1. Download LuaRocks: http://luarocks.github.io/luarocks/releases/
+2. Extract
+3. luarocks PATH or open cmd in luarock directory
+3. Set Lua executable with this command:
+   > luarocks config --local lua_dir <C:\Users\user01\bin>
+4. 

@@ -1,13 +1,7 @@
 import torch
-import torch.nn as nn
 import torch.optim as optim
-import torch.nn.functional as F
 import argparse
 import os
-import torch.backends.cudnn as cudnn
-import torchvision.transforms as transforms
-from torch.utils.data import DataLoader
-from torchvision.datasets import CIFAR10
 
 parser = argparse.ArgumentParser(description='Train a multi-modal embedding model')
 
@@ -58,14 +52,17 @@ if opt.image_noop:
 torch.manual_seed(opt.seed)
 print(opt)
 
-if opt.bidirectional == 1:
-    FixedRNN = require('modules.BidirectionalRNN')
-else:
-    FixedRNN = require('modules.FixedRNN')
-DocumentCNN = require('modules.HybridCNN')
-ImageEncoder = require('modules.ImageEncoder')
-MultimodalMinibatchLoader = require('util.MultimodalMinibatchLoaderCaption')
-model_utils = require('util.model_utils')
+# if opt.bidirectional == 1:
+#     FixedRNN = require('modules.BidirectionalRNN')
+# else:
+#     FixedRNN = require('modules.FixedRNN')
+# DocumentCNN = require('modules.HybridCNN')
+from python.modules.HybridCNN import HybridCNN as DocumentCNN
+# ImageEncoder = require('modules.ImageEncoder')
+from python.modules.ImageEncoder import ImageEncoder
+# MultimodalMinibatchLoader = require('util.MultimodalMinibatchLoaderCaption')
+# model_utils = require('util.model_utils')
+from python.util.model_utils import model_utils
 
 # Initialize CUDA for training on the GPU and fallback to CPU gracefully
 if opt.gpuid >= 0:
@@ -163,21 +160,22 @@ def wrap_emb(inp, nh, nx, ny, labs):
     return loss, grad
 
 
-if opt.checkgrad == 1:
-    print('\nChecking embedding gradient\n')
-    nh = 3
-    nx = 4
-    ny = 2
-    txt = torch.randn(nx, nh)
-    img = torch.randn(ny, nh)
-    labs = torch.randperm(nx)
-    initpars = torch.cat((txt.clone().reshape(nh * nx), img.clone().reshape(nh * ny)))
-    opfunc = lambda curpars: wrap_emb(curpars, nh, nx, ny, labs)
-    diff, dC, dC_est = checkgrad(opfunc, initpars, 1e-3)
-    print(dC)
-    print(dC_est)
-    print(diff)
-    debug.debug()
+#
+# if opt.checkgrad == 1:
+#     print('\nChecking embedding gradient\n')
+#     nh = 3
+#     nx = 4
+#     ny = 2
+#     txt = torch.randn(nx, nh)
+#     img = torch.randn(ny, nh)
+#     labs = torch.randperm(nx)
+#     initpars = torch.cat((txt.clone().reshape(nh * nx), img.clone().reshape(nh * ny)))
+#     opfunc = lambda curpars: wrap_emb(curpars, nh, nx, ny, labs)
+#     diff, dC, dC_est = checkgrad(opfunc, initpars, 1e-3)
+#     print(dC)
+#     print(dC_est)
+#     print(diff)
+#     debug.debug()
 
 
 def feval_wrap(pars):

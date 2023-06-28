@@ -1,0 +1,4 @@
+--name pydsje
+--data-dir "/mnt/c/Users/dndlssardar/OneDrive - Smiths Group/Documents/Projects/StackGAN-Pytorch/data/sixray_2381"
+--class-name-file "/mnt/c/Users/dndlssardar/OneDrive - Smiths Group/Documents/Projects/StackGAN-Pytorch/data/sixray_2381/train/classes.txt"
+--drop-last

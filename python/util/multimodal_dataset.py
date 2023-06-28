@@ -1,3 +1,4 @@
+import csv
 import os
 import pathlib
 import random
@@ -78,16 +79,19 @@ class MultimodalDataset(Dataset):
         | - classes.txt
     """
     
-    def __init__(self, dataset_path, classnames, doc_length, img_dim,
+    def __init__(self, dataset_path, classnames, label_file, doc_length, img_dim,
                  image_transform=None, caption_transform=None, target_transform=None,
                  split="train",
-                 images_dir="JPEGImages", caption_dir="Captions", image_extension=".jpeg"):
+                 images_dir="JPEGImages", caption_dir="Captions", image_extension=".jpg"):
         assert split in ("train", "text")
-        self.dataset_path = pathlib.Path(dataset_path)
+        dataset_path = pathlib.Path(dataset_path)
+        self.dataset_path = dataset_path
         self.images_dir = dataset_path / split / images_dir
         self.caption_dir = dataset_path / split / caption_dir
+        self.label_file = pathlib.Path(label_file)
         # read class names
         self.classnames = classnames
+        self.classname_dict = {k: v for v, k in enumerate(classnames)}
         assert len(self.classnames) > 0, "A list of classnames is required"
         self.doc_length = doc_length
         # read images
@@ -96,8 +100,12 @@ class MultimodalDataset(Dataset):
         # read captions
         self.captions = [os.path.join(self.caption_dir, file) for file in os.listdir(self.caption_dir) if
                          file.endswith(".txt")]
-        assert len(self.images) == len(self.captions), \
-            "The count of images and captions must be same, got {}!={}".format(len(self.images), len(self.captions))
+        self.labels = []
+        with open(self.label_file) as fp:
+            self.labels = {k: v for k, v in map(lambda x: x.strip().split(','), fp.readlines())}
+        assert len(self.images) == len(
+            self.captions), "The count of images and captions must be same, got {}!={}".format(len(self.images),
+                                                                                               len(self.captions))
         if image_transform is None:
             image_transform = transforms.Compose([
                 transforms.Resize(img_dim),
@@ -108,36 +116,57 @@ class MultimodalDataset(Dataset):
         if caption_transform is None:
             caption_transform = transforms.Compose([
                 transforms.Lambda(self._basic_char_encoder),
-                transforms.ToTensor(),
             ])
         
         if target_transform is None:
             target_transform = transforms.Compose([
                 transforms.Lambda(self._class_encoder),
-                transforms.ToTensor(),
             ])
         self.image_transform = image_transform
         self.caption_transform = caption_transform
         self.target_transform = target_transform
-        self.vocabulary = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
+        self.vocabulary = "\nabcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
         self.vocab_length = len(self.vocabulary)
+        self.class_ids = [cls_idx for cls_idx, lbl in enumerate(self.classnames)]
+        self.dtype = torch.float16
     
     def _class_encoder(self, label):
-        for cls_idx, lbl in enumerate(self.classnames):
-            if label == lbl:
-                return cls_idx
-        return -1
+        try:
+            return torch.tensor(self.classname_dict[label])
+        except:
+            return torch.tensor(-1)
     
     def _basic_char_encoder(self, caption):
+        """Must remove '\n' character. It currently supports ASCII characters"""
         # lowercase
-        caption = caption.lower()
+        caption = caption.lower().strip()
+        
+        def __get_index(word, space=True):
+            if space:
+                yield self.vocabulary.index(' ')
+            for char in list(word):
+                try:
+                    yield self.vocabulary.index(char)
+                except:
+                    yield 0
+        
+        char_ids = []
+        # encode characters
+        [char_ids.extend(list(__get_index(list(char)))) for char in caption.split()]
+        char_ids = char_ids[1:]  # skip the first character as it is always 'space'
+        
         # truncate if the sentence is large
-        if len(caption.split()) > self.doc_length:
-            caption = "".join(caption.split()[:self.doc_length])
+        if len(char_ids) > self.doc_length:
+            char_ids = char_ids[:self.doc_length]
+        
+        # place encoding into a tensor
         char_encode = torch.zeros(self.doc_length, self.vocab_length)
-        char_idx = [self.vocabulary.index(char) for char in caption.split()]
-        for idx, char_idx in enumerate(char_idx):
-            char_encode[idx, char_idx] = 1
+        for idx, char_code in enumerate(char_ids[1:]):
+            try:
+                char_encode[idx, char_code] = 1
+            except IndexError as e:
+                print("Error: CaptionL:", caption, len(caption), idx, char_code, len(char_ids), char_encode.shape)
+                raise e
         return char_encode
     
     def get_img(self, img_path) -> torch.Tensor:
@@ -145,25 +174,21 @@ class MultimodalDataset(Dataset):
         img = self.image_transform(img)
         return img
     
-    def get_caption(self, caption_path) -> (str, int):
+    def get_caption(self, caption_path, ) -> str:
         with open(caption_path) as fp:
             captions = fp.readlines()
             captions_ix = random.randint(0, len(captions) - 1)
             caption = captions[captions_ix]
-            class_id = None
-            for label in self.classnames:
-                if label in caption:
-                    class_id = label
-                    break
             caption = self.caption_transform(caption)
-            class_id = self.target_transform(class_id)
-            return caption, class_id
+            return caption
     
     def __getitem__(self, idx):
         image_file = self.images[idx]
         caption_file = self.captions[idx]
         image = self.get_img(image_file)
-        caption, label = self.get_caption(caption_file)
+        caption = self.get_caption(caption_file)
+        filename = os.path.basename(image_file)
+        label = self.target_transform(self.labels[filename])
         return caption, image, label
     
     def __len__(self):

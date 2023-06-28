@@ -158,12 +158,12 @@ def weights_init(m):
 
 
 #############################
-def save_model(net_img, net_txt, epoch, model_dir):
+def save_model(netIMG, netTXT, epoch, model_dir):
     torch.save(
-        net_img.state_dict(),
+        netIMG.state_dict(),
         '%s/netIMG_epoch_%d.pth' % (model_dir, epoch))
     torch.save(
-        net_txt.state_dict(),
+        netTXT.state_dict(),
         '%s/netTXT_epoch_last.pth' % model_dir)
     print('Save G/D models')
 
@@ -176,3 +176,37 @@ def mkdir_p(path):
             pass
         else:
             raise
+
+
+def JointEmbeddingLoss(fea_txt, fea_img, labels, params):
+    batch_size = fea_img.size(0)
+    num_class = fea_txt.size(0)
+    score = torch.zeros(batch_size, num_class)
+    txt_grads = fea_txt.clone().fill_(0)
+    img_grads = fea_img.clone().fill_(0)
+    
+    loss = 0
+    params.acc_batch = 0.0
+    for i in range(batch_size):
+        for j in range(num_class):
+            score[i, j] = torch.dot(fea_img[i], fea_txt[j])
+        label_score = score[i, labels[i]]
+        for j in range(num_class):
+            if j != labels[i]:
+                cur_score = score[i, j]
+                thresh = cur_score - label_score + 1
+                if thresh > 0:
+                    loss += thresh
+                    txt_diff = fea_txt[j] - fea_txt[labels[i]]
+                    img_grads[i].add_(txt_diff)
+                    txt_grads[j].add_(fea_img[i])
+                    txt_grads[labels[i]].add_(-fea_img[i])
+        max_score, max_ix = torch.max(score[i].unsqueeze(0), 1)
+        if max_ix.item() == labels[i]:
+            params.acc_batch += 1
+    
+    acc_batch = 100 * (params.acc_batch / batch_size)
+    denom = batch_size * num_class
+    res = {1: txt_grads.div_(denom), 2: img_grads.div_(denom)}
+    params.acc_smooth = 0.99 * params.acc_smooth + 0.01 * acc_batch
+    return loss / denom, res

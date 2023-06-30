@@ -1,17 +1,16 @@
 import gc
 import os
 import time
-from netrc import netrc
 
 import torch
 from accelerate import Accelerator
-from torch import optim, autograd, nn, Tensor
+from torch import optim, Tensor
 from torch.backends import cudnn
 from torch.utils.tensorboard import SummaryWriter
 
-from python.modules.HybridCNN import HybridCNN
-from python.modules.ImageEncoder import ImageEncoder
-from python.util.model_utils import mkdir_p, weights_init, JointEmbeddingLoss, save_model
+from modules.HybridCNN import HybridCNN
+from modules.ImageEncoder import ImageEncoder
+from util.model_utils import mkdir_p, weights_init, save_model
 
 
 class JointEmbeddingTrainer:
@@ -82,6 +81,49 @@ class JointEmbeddingTrainer:
         # print("Shape batch_F:", batch_F.shape)
         return batch_F.to(self.device)
     
+    def joint_embedding_loss0(self, batch_enc_txt, batch_enc_img, batch_label, class_ids):
+        yn = batch_label
+        vn = batch_enc_txt
+        tn = batch_enc_img
+        
+        def repeat(low_dim: Tensor, high_dim: Tensor, axis=0):
+            """
+            This function create a higher dimensional tensor form a lower dimensional tensor by repeating
+            the contents in one dimension. For example, a tensor "low_dim(100 x 1536)" contains some encoding values.
+            Now we have a batch of 10 encoded quantities in another tensor "high_dim(10 x 100 x 1536)". This function
+            can produce a "low_dim(10 x 100 x 1536)" by repeating the original "low_dim(100 x 1536)" 10 times at the
+            axis=0.
+            :param low_dim:
+            :param high_dim:
+            :param axis:
+            :return:
+            """
+            x = low_dim.repeat(high_dim.shape[axis]).reshape(high_dim.shape)
+            return x.to(self.device)
+        
+        batch_size = yn.shape[0]
+        nx_classes = len(class_ids)
+        vntn = self.compatibility_F(vn, tn).reshape(batch_size)
+        # print("\nShape yn:", yn.shape, "vn:", vn.shape, "rn:", tn.shape, "vntn:", vntn.shape)
+        # batch x classes+1 matrix
+        lv_batch = torch.zeros(batch_size, nx_classes + 1).to(self.device)
+        lt_batch = torch.zeros(batch_size, nx_classes + 1).to(self.device)
+        # print("Shape lv_batch:", lv_batch.shape, "lt_batch:", lt_batch.shape)
+        for cls_idx, y in enumerate(class_ids):
+            yny = self.delta(yn, repeat(torch.tensor(y), yn))
+            # print("Shape yny:", yny.shape)
+            for batch_idx, t in enumerate(batch_enc_txt):
+                class_scores = yny + self.compatibility_F(vn, repeat(t, vn)).reshape(batch_size) - vntn
+                lv_batch[batch_idx, :-1] = class_scores  # excluding 0
+            for batch_idx, v in enumerate(batch_enc_img):
+                class_scores = yny + self.compatibility_F(repeat(v, tn), tn) - vntn
+                lt_batch[batch_idx, :-1] = class_scores  # excluding 0
+        # batch wise all class max including 0 for both lists lv and lt, followed by average
+        loss = torch.max(lv_batch, dim=1).values.sum() + torch.max(lt_batch, dim=1).values.sum() / torch.tensor(
+            batch_size).to(self.device)
+        # print("Shape loss:", loss.shape)
+        return loss
+    
     def joint_embedding_loss(self, batch_enc_txt, batch_enc_img, batch_label, class_ids):
         yn = batch_label
         vn = batch_enc_txt
@@ -106,19 +148,21 @@ class JointEmbeddingTrainer:
         nx_classes = len(class_ids)
         vntn = self.compatibility_F(vn, tn).reshape(batch_size)
         # print("\nShape yn:", yn.shape, "vn:", vn.shape, "rn:", tn.shape, "vntn:", vntn.shape)
-        lv_list = torch.zeros(batch_size, nx_classes + 1).to(self.device)
-        lt_list = torch.zeros(batch_size, nx_classes + 1).to(self.device)
-        # print("Shape lv_list:", lv_list.shape, "lt_list:", lt_list.shape)
+        # batch x classes+1 matrix
+        lv_batch = torch.zeros(batch_size, nx_classes + 1).to(self.device)
+        lt_batch = torch.zeros(batch_size, nx_classes + 1).to(self.device)
+        # print("Shape lv_batch:", lv_batch.shape, "lt_batch:", lt_batch.shape)
         for cls_idx, y in enumerate(class_ids):
             yny = self.delta(yn, repeat(torch.tensor(y), yn))
             # print("Shape yny:", yny.shape)
             for batch_idx, t in enumerate(batch_enc_txt):
-                batch_val = yny + self.compatibility_F(vn, repeat(t, vn)).reshape(batch_size) - vntn
-                lv_list[batch_idx, :-1] = batch_val
+                class_scores = yny + self.compatibility_F(vn, repeat(t, vn)).reshape(batch_size) - vntn
+                lv_batch[batch_idx, :-1] = class_scores  # excluding 0
             for batch_idx, v in enumerate(batch_enc_img):
-                batch_val = yny + self.compatibility_F(repeat(v, tn), tn) - vntn
-                lt_list[batch_idx, :-1] = batch_val
-        loss = torch.max(lv_list, dim=1).values.sum() + torch.max(lt_list, dim=1).values.sum() / torch.tensor(
+                class_scores = yny + self.compatibility_F(repeat(v, tn), tn) - vntn
+                lt_batch[batch_idx, :-1] = class_scores  # excluding 0
+        # batch wise all class max including 0 for both lists lv and lt, followed by average
+        loss = torch.max(lv_batch, dim=1).values.sum() + torch.max(lt_batch, dim=1).values.sum() / torch.tensor(
             batch_size).to(self.device)
         # print("Shape loss:", loss.shape)
         return loss

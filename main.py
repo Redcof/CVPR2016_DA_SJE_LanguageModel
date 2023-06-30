@@ -9,8 +9,8 @@ import datetime
 
 from torchvision.transforms import transforms
 
-from python.modules.joint_embedding import JointEmbeddingTrainer
-from python.util.multimodal_dataset import MultimodalDataset, AspectResize
+from modules.joint_embedding import JointEmbeddingTrainer
+from util.multimodal_dataset import MultimodalDataset, AspectResize
 
 
 def parse_args():
@@ -71,29 +71,27 @@ def main():
     # load classnames
     with open(args.class_file) as fp:
         args.classnames = list(map(lambda x: x.strip(), fp.readlines()))
-
+    
     # prepare GPU and batches
     s_gpus = args.gpu_id.split(',')
     gpus = [int(ix) for ix in s_gpus]
     num_gpus = len(gpus)
     batch_size = args.batch_size * num_gpus
-    torch.cuda.set_device(gpus[0])
-    cudnn.benchmark = True
-
+    
     # image transform
     image_transform = transforms.Compose([
         AspectResize(args.imgsize),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-
+    
     # load dataset
     train_dataset = MultimodalDataset(args.data_dir, args.classnames, args.label_csv, args.doc_length, args.imgsize,
                                       split=phase,
                                       image_transform=image_transform)
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, drop_last=args.drop_last,
                                   shuffle=True, num_workers=int(args.workers))
-
+    
     trainer = JointEmbeddingTrainer(args.data_dir, args)
     trainer.train(train_dataloader, args)
 

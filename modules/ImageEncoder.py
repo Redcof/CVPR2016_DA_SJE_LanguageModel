@@ -3,7 +3,7 @@ import pathlib
 import torch
 import torch.nn as nn
 
-from python.modules.common_model_interface import CommonModel
+from modules.common_model_interface import CommonModel
 
 
 class ImageEncoder(CommonModel):

@@ -9,7 +9,7 @@ import datetime
 
 from torchvision.transforms import transforms
 
-from modules.joint_embedding import JointEmbeddingTrainer
+from modules.joint_embedding_trainer import JointEmbeddingTrainer
 from util.multimodal_dataset import MultimodalDataset, AspectResize
 
 
@@ -92,7 +92,7 @@ def main():
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, drop_last=args.drop_last,
                                   shuffle=True, num_workers=int(args.workers))
     
-    trainer = JointEmbeddingTrainer(args.data_dir, args)
+    trainer = JointEmbeddingTrainer(output_dir, args)
     trainer.train(train_dataloader, args)
 
 

@@ -157,10 +157,10 @@ class JointEmbeddingTrainer:
             # print("Shape yny:", yny.shape)
             for batch_idx, t in enumerate(batch_enc_txt):
                 class_scores = yny + self.compatibility_F(vn, repeat(t, vn)).reshape(batch_size) - vntn
-                lv_batch[batch_idx, :-1] = class_scores  # excluding 0
+                lv_batch[:, cls_idx] = class_scores  # excluding 0
             for batch_idx, v in enumerate(batch_enc_img):
                 class_scores = yny + self.compatibility_F(repeat(v, tn), tn) - vntn
-                lt_batch[batch_idx, :-1] = class_scores  # excluding 0
+                lt_batch[:, cls_idx] = class_scores  # excluding 0
         # batch wise all class max including 0 for both lists lv and lt, followed by average
         loss = torch.max(lv_batch, dim=1).values.sum() + torch.max(lt_batch, dim=1).values.sum() / torch.tensor(
             batch_size).to(self.device)

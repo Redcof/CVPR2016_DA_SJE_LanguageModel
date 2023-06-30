@@ -82,7 +82,7 @@ class MultimodalDataset(Dataset):
     def __init__(self, dataset_path, classnames, label_file, doc_length, img_dim,
                  image_transform=None, caption_transform=None, target_transform=None,
                  split="train",
-                 images_dir="JPEGImages", caption_dir="Captions", image_extension=".jpg"):
+                 images_dir="JPEGImages", caption_dir="captions", image_extension=".jpg"):
         assert split in ("train", "text")
         dataset_path = pathlib.Path(dataset_path)
         self.dataset_path = dataset_path

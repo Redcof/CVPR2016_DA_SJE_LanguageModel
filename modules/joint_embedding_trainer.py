@@ -210,8 +210,6 @@ class JointEmbeddingTrainer:
             
             loop_ran = False
             for batch_idx, (txt_batch, img_batch, label_batch) in enumerate(data_loader, 0):
-                print("memory_allocated(GB): ", torch.cuda.memory_allocated() / 1e9)
-                print("memory_cached(GB): ", torch.cuda.memory_reserved() / 1e9)
                 print("\rEpoch: {}/{} Batch: {}/{} ".format(epoch + 1, self.max_epoch, batch_idx + 1, len(data_loader)),
                       end="\b")
                 loop_ran = True

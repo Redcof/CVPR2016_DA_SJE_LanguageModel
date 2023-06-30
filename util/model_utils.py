@@ -164,8 +164,8 @@ def save_model(netIMG, netTXT, epoch, model_dir):
         '%s/netIMG_epoch_%d.pth' % (model_dir, epoch))
     torch.save(
         netTXT.state_dict(),
-        '%s/netTXT_epoch_last.pth' % model_dir)
-    print('Save G/D models')
+        '%s/netTXT_epoch_%d.pth' % (model_dir, epoch))
+    print('Save models')
 
 
 def mkdir_p(path):

@@ -44,6 +44,9 @@ class TextEncoderTransformInterface(torch.nn.Module):
         self.doc_length = doc_length
         self.vocabulary = vocabulary
         self.vocab_length = len(self.vocabulary)
+        MINIMUM = 70
+        if self.doc_length < MINIMUM:
+            self.doc_length = MINIMUM
     
     @abstractmethod
     def split(self, caption):

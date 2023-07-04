@@ -212,8 +212,6 @@ class JointEmbeddingTrainer:
             
             loop_ran = False
             for batch_idx, (txt_batch, img_batch, label_batch) in enumerate(data_loader, 0):
-                print("\rEpoch: {}/{} Batch: {}/{} ".format(epoch + 1, self.max_epoch, batch_idx + 1, len(data_loader)),
-                      end="\b")
                 loop_ran = True
                 #############################
                 # (1) Prepare training data
@@ -259,6 +257,10 @@ class JointEmbeddingTrainer:
                     ###########################
                     # self.test(netIMG, test_dataset.embeddings, self.image_dir, epoch)
                     ...
+                print("\rEpoch: {}/{} Batch: {}/{} Loss: {} Memory(GB): {} ".format(
+                    epoch + 1, self.max_epoch, batch_idx + 1, len(data_loader),
+                    round(joint_loss.data.item(), 4), round(torch.cuda.memory_allocated() / 1e9, 4)
+                ), end="\b")
             
             if loop_ran is False:
                 raise Warning(
@@ -284,8 +286,8 @@ class JointEmbeddingTrainer:
             # Fix: https://discuss.pytorch.org/t/how-to-totally-free-allocate-memory-in-cuda/79590
             torch.cuda.empty_cache()
             gc.collect()
-            print("After memory_allocated(GB): ", torch.cuda.memory_allocated() / 1e9)
-            print("After memory_cached(GB): ", torch.cuda.memory_reserved() / 1e9)
+            # print("After memory_allocated(GB): ", torch.cuda.memory_allocated() / 1e9)
+            # print("After memory_cached(GB): ", torch.cuda.memory_reserved() / 1e9)
             # CLEAN GPU RAM ########################
         #
         save_model(netIMG, netTXT, self.max_epoch, self.model_dir)

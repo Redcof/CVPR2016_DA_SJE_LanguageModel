@@ -7,6 +7,6 @@ python main.py --name "pydsje" \
   --emd-dim 1536 \
   --batch-size 128 \
   --max-epoch 180 \
-  --emdedding-strategy word \
+  --embedding-strategy word \
   --doc-length 60 \
   --cuda

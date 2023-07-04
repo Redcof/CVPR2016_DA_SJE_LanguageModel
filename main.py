@@ -103,7 +103,7 @@ def main():
     captions = []
     if args.embedding_strategy in ('word', 'fasttext'):
         dataset_path = pathlib.Path(args.data_dir)
-        caption_dir = dataset_path / phase / "Captions"
+        caption_dir = dataset_path / phase / "captions"
         caption_files = [os.path.join(caption_dir, file) for file in os.listdir(caption_dir) if
                          file.endswith(".txt")]
         for caption_file in caption_files:

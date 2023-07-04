@@ -7,4 +7,5 @@ python main.py --name "pydsje" \
   --emd-dim 1536 \
   --batch-size 64 \
   --max-epoch 180 \
+  --doc-length 60 \
   --cuda

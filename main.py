@@ -79,7 +79,7 @@ def main():
     print("Output:", output_dir)
     # set random seeds
     if args.manualSeed is None:
-        args.manualSeed = random.randint(1, 10000)
+        args.manualSeed = 47
     random.seed(args.manualSeed)
     torch.manual_seed(args.manualSeed)
     torch.cuda.manual_seed_all(args.manualSeed)
@@ -110,11 +110,15 @@ def main():
             with open(caption_file) as fp:
                 captions.extend([caption.lower().strip() for caption in fp.readlines()])
         
-        max_len = float("-Inf")
+        max_char_len = float("-Inf")
+        max_word_len = float("-Inf")
         for caption in captions:
-            if len(caption) > max_len:
-                max_len = len(caption)
-        print("Max caption length:", max_len)
+            if len(caption) > max_char_len:
+                max_char_len = len(caption)
+            if len(caption.strip().split()) > max_word_len:
+                max_word_len = len(caption.strip().split())
+        print("Max char length:", max_char_len)
+        print("Max word length:", max_word_len)
     
     # create a caption initial encoder object
     embed_transform = EmbeddingFactory(args.embedding_strategy, args.doc_length, captions=captions)

@@ -5,7 +5,7 @@ python main.py --name "pydsje" \
   --label-csv "../StackGAN-Pytorch/data/sixray_2381/train/labels.csv" \
   --drop-last \
   --emd-dim 1536 \
-  --batch-size 64 \
+  --batch-size 128 \
   --max-epoch 180 \
   --doc-length 60 \
   --cuda

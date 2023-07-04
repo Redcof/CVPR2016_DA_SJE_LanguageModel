@@ -1,16 +1,19 @@
 import argparse
+import os
+import pathlib
 import random
 
 import dateutil.tz
 import torch
-from torch.backends import cudnn
 from torch.utils.data import DataLoader
 import datetime
 
 from torchvision.transforms import transforms
 
 from modules.joint_embedding_trainer import JointEmbeddingTrainer
-from util.multimodal_dataset import MultimodalDataset, AspectResize
+from util.aspect_resize_transform import AspectResize
+from util.multimodal_dataset import MultimodalDataset
+from util.text_encoder_interface import CharEmbedTransform, EmbeddingFactory
 
 
 def parse_args():
@@ -24,6 +27,18 @@ def parse_args():
                         help="A csv file that contains filename and label name ")
     # optional
     parser.add_argument('--snapshot-interval', dest='snapshot_interval', type=int, default=5)
+    parser.add_argument('--embedding-strategy', dest='embedding_strategy', type=str, default='char',
+                        choices=('char', 'word', 'word2vec', 'glove25', 'glove50', 'glove100', 'glove200', 'glove300',
+                                 'fasttext-en', 'fasttext'),
+                        help="Specify the initial text encoding strategy. "
+                             "char: one-hot-encode each character."
+                             "word: one-hot-encode each word. "
+                             "word2vec: encode word with word2vec encoder."
+                             "glove: encode word with GloVe encoder. Specify 25, 50, 100, 200, and 300 as per the need."
+                             "fasttext-en: use pretrained FastText English model."
+                             "fasttext: First train the given caption data and use it for encoding."
+                             "openai: Use openai pretrained document encoder."
+                        )
     parser.add_argument('--batch-size', dest='batch_size', type=int, default=4)
     parser.add_argument('--emd-dim', dest='emb_dim', type=int, default=1536, help="Joint embedding dimension")
     parser.add_argument('--imgsize', dest='imgsize', type=int, default=256, help="Image input size")
@@ -60,7 +75,7 @@ def main():
     # prepare output directory
     now = datetime.datetime.now(dateutil.tz.tzlocal())
     timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
-    output_dir = 'output/%s_%s_%s' % (args.name, phase, timestamp)
+    output_dir = 'output/%s_%s_%s_%s' % (args.name, args.embedding_strategy, phase, timestamp)
     print("Output:", output_dir)
     # set random seeds
     if args.manualSeed is None:
@@ -84,11 +99,35 @@ def main():
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+    # read all the captions
+    captions = []
+    if args.embedding_strategy in ('word', 'fasttext'):
+        dataset_path = pathlib.Path(args.data_dir)
+        caption_dir = dataset_path / phase / "Captions"
+        caption_files = [os.path.join(caption_dir, file) for file in os.listdir(caption_dir) if
+                         file.endswith(".txt")]
+        for caption_file in caption_files:
+            with open(caption_file) as fp:
+                captions.extend([caption.lower().strip() for caption in fp.readlines()])
+        
+        max_len = float("-Inf")
+        for caption in captions:
+            if len(caption) > max_len:
+                max_len = len(caption)
+        print("Max caption length:", max_len)
+    
+    # create a caption initial encoder object
+    embed_transform = EmbeddingFactory(args.embedding_strategy, args.doc_length, captions=captions)
+    caption_transform = transforms.Compose([
+        embed_transform.txt_embedding_transform,
+    ])
     
     # load dataset
     train_dataset = MultimodalDataset(args.data_dir, args.classnames, args.label_csv, args.doc_length, args.imgsize,
                                       split=phase,
-                                      image_transform=image_transform)
+                                      image_transform=image_transform,
+                                      caption_transform=caption_transform)
+    train_dataset.vocab_length = embed_transform.txt_embedding_transform.vocab_length
     train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, drop_last=args.drop_last,
                                   shuffle=True, num_workers=int(args.workers))
     

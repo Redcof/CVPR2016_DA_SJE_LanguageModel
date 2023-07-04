@@ -170,6 +170,9 @@ class JointEmbeddingTrainer:
         return loss_scaler
     
     def train(self, data_loader, args, test_dataset=None):
+        with open(os.path.join(self.log_dir, "config.txt"), "w") as fp:
+            fp.write("%s" % (str(args)))
+        
         # load network
         netIMG = self.load_netIMG(args)
         netTXT = self.load_netTXT(data_loader.dataset, args)

@@ -6,7 +6,7 @@ python main.py --name "pydsje" \
   --drop-last \
   --emd-dim 1536 \
   --batch-size 128 \
-  --max-epoch 180 \
+  --max-epoch 500 \
   --embedding-strategy char \
   --doc-length 170 \
   --cuda

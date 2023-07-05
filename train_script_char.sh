@@ -8,5 +8,5 @@ python main.py --name "pydsje" \
   --batch-size 128 \
   --max-epoch 180 \
   --embedding-strategy char \
-  --doc-length 350 \
+  --doc-length 170 \
   --cuda

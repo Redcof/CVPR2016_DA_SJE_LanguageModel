@@ -171,6 +171,7 @@ class JointEmbeddingTrainer:
     
     def train(self, data_loader, args, test_dataset=None):
         with open(os.path.join(self.log_dir, "config.txt"), "w") as fp:
+            args.batch_count = len(data_loader)
             fp.write("%s" % (str(args)))
         
         # load network
@@ -251,7 +252,7 @@ class JointEmbeddingTrainer:
                 
                 count = count + 1
                 if batch_idx % 100 == 0:
-                    self.summary_writer.add_scalar('loss', joint_loss.data, count)
+                    self.summary_writer.add_scalar('loss@step', joint_loss.data, count)
                 if (epoch % self.snapshot_interval == 0 or epoch == self.max_epoch - 1) and batch_idx % 100 == 0:
                     # save the image result for each epoch
                     # save_img_results(None, lr_fake, epoch, self.image_dir)
@@ -280,7 +281,7 @@ class JointEmbeddingTrainer:
             
             if epoch % self.snapshot_interval == 0:
                 save_model(netIMG, netTXT, epoch, self.model_dir)
-            
+            self.summary_writer.add_scalar('loss@epoch', joint_loss.data, epoch)
             # CLEAN GPU RAM  ########################
             del joint_loss
             del txt_batch

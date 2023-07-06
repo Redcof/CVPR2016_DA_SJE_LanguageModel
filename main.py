@@ -5,6 +5,7 @@ import random
 
 import dateutil.tz
 import torch
+from git import Repo
 from torch.utils.data import DataLoader
 import datetime
 
@@ -13,7 +14,7 @@ from torchvision.transforms import transforms
 from modules.joint_embedding_trainer import JointEmbeddingTrainer
 from util.aspect_resize_transform import AspectResize
 from util.multimodal_dataset import MultimodalDataset
-from util.text_encoder_interface import CharEmbedTransform, EmbeddingFactory
+from util.text_encoder_interface import EmbeddingFactory
 
 
 def parse_args():
@@ -75,6 +76,10 @@ def main():
     # prepare output directory
     now = datetime.datetime.now(dateutil.tz.tzlocal())
     timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
+    args.timestamp = timestamp  # save timestamp in the config
+    project_root = pathlib.Path(__file__).parents[0]
+    repo = Repo(project_root)
+    args.git_checksum = repo.git.rev_parse("HEAD")  # save commit checksum
     output_dir = 'output/%s_%s_%s_%s' % (args.name, args.embedding_strategy, phase, timestamp)
     print("Output:", output_dir)
     # set random seeds

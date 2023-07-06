@@ -6,7 +6,14 @@ python main.py --name "pydsje" \
   --drop-last \
   --emd-dim 1536 \
   --batch-size 128 \
-  --max-epoch 500 \
+  --epoch-start 0 \
+  --max-epoch 1000 \
   --embedding-strategy word \
   --doc-length 61 \
   --cuda
+#  --finetune
+#  --epoch-start 501 \
+#  --max-epoch 1000 \
+#  --finetune \
+#  --NET-IMG 'output/pydsje_word_train_2023_07_05_18_32_24/Model/netIMG_epoch_500.pth' \
+#  --NET-TXT 'output/pydsje_word_train_2023_07_05_18_32_24/Model/netTXT_epoch_500.pth' \

@@ -55,10 +55,10 @@ def parse_args():
                         help="Specify enable test phase. Default will train")
     parser.add_argument('--finetune', dest='finetune', default=False, action='store_true',
                         help="Specify enable test phase. Default will train")
-    parser.add_argument('--cuda', dest='cuda', default=False, action='store_true',
-                        help="To enable training on GPU")
     parser.add_argument('--NET-IMG', dest='NET_IMG', default='', help="Path to Image Encoder Network")
     parser.add_argument('--NET-TXT', dest='NET_TXT', default='', help="Path to Text Encoder Network")
+    parser.add_argument('--cuda', dest='cuda', default=False, action='store_true',
+                        help="To enable training on GPU")
     parser.add_argument('--gpu', dest='gpu_id', type=str, default='0')
     parser.add_argument('--manual-seed', dest='manualSeed', type=int, help='manual seed', default=47)
     parser.add_argument('--lr-img', dest="lr_img", type=float, default=0.0004, help='learning rate')

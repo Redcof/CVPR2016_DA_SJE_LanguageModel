@@ -153,7 +153,7 @@ class WordEmbedTransform(TextEncoderTransformInterface):
         super().__init__(vocabulary, doc_length)
     
     def split(self, caption):
-        return caption.split()
+        return clean(caption).split()
 
 
 class Word2VecTransform(torch.nn.Module):

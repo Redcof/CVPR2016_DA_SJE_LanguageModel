@@ -33,8 +33,19 @@ class EmbeddingFactory:
                     max_word_len = len(caption.strip().split())
             print("Doc length(char):", max_char_len)
             print("Doc length(word):", max_word_len)
+        if args.predict and args.embedding_strategy == "word":
+            assert os.path.exists(args.vocabulary_txt), "Inference using 'word' embedding " \
+                                                        "strategy requires a `vocabulary.txt` file " \
+                                                        "generated during training"
+            with open(args.vocabulary_txt) as fp:
+                vocabulary = list(map(lambda x: x.strip(), fp.readlines()))
+        else:
+            vocabulary = []
+            for caption in captions:
+                vocabulary.extend(caption.split())
+            vocabulary = list(set(vocabulary))
         if strategy == "word":
-            txt_embedding = WordEmbedTransform(doc_length, captions=captions)
+            txt_embedding = WordEmbedTransform(doc_length, vocabulary)
         elif strategy == "word2vec":
             txt_embedding = Word2VecTransform(**kwargs)
         elif strategy == "glove25":
@@ -48,7 +59,7 @@ class EmbeddingFactory:
         elif strategy == "glove300":
             txt_embedding = GloVeEmbeddingTransform(300)
         elif strategy == "fasttext":
-            txt_embedding = FasttestTrainTransform(**kwargs)
+            txt_embedding = FasttestTrainTransform(captions, args.emb_dim)
         elif strategy == "fasttext-en":
             txt_embedding = FasttextPretrainedTransform(**kwargs)
         elif strategy == "openai":
@@ -138,12 +149,8 @@ class CharEmbedTransform(TextEncoderTransformInterface):
 
 class WordEmbedTransform(TextEncoderTransformInterface):
     
-    def __init__(self, doc_length, captions):
-        words = []
-        for caption in captions:
-            words.extend(caption.split())
-        words = list(set(words))
-        super().__init__(words, doc_length)
+    def __init__(self, doc_length, vocabulary):
+        super().__init__(vocabulary, doc_length)
     
     def split(self, caption):
         return caption.split()

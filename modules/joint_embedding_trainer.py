@@ -1,6 +1,7 @@
 import gc
 import os
 import pathlib
+import pickle
 import time
 
 import torch
@@ -55,11 +56,17 @@ class JointEmbeddingTrainer:
         # create models
         netTXT = HybridCNN(args.vocab_length, args.emb_dim, dropout=args.dropout)
         netTXT.apply(weights_init)
+        if args.predict or args.finetune:
+            state_dict = torch.load(args.NET_TXT, map_location=lambda storage, loc: storage)
+            netTXT.load_state_dict(state_dict)
         netTXT.to(self.device)  # using accelerator
         return netTXT
     
     def load_netIMG(self, args):
         netIMG = ImageEncoder(args.emb_dim)
+        if args.predict or args.finetune:
+            state_dict = torch.load(args.NET_IMG, map_location=lambda storage, loc: storage)
+            netIMG.load_state_dict(state_dict)
         netIMG.to(self.device)  # using accelerator
         return netIMG
     
@@ -303,3 +310,59 @@ class JointEmbeddingTrainer:
         #
         self.summary_writer.flush()
         self.summary_writer.close()
+    
+    def run_inference(self, args, captions, embed_transform, netTXT):
+        batch_txt = torch.Tensor(len(captions), args.doc_length, args.vocab_length)
+        for idx, caption in enumerate(captions):
+            batch_txt[idx, :, :] = embed_transform(caption)
+        batch_txt.to(self.device)
+        batch_enc_txt = netTXT(batch_txt)
+        return batch_enc_txt
+    
+    def predict(self, args):
+        assert os.path.isfile(args.NET_TXT), "A valid pretrained path to text " \
+                                             "embedding network is required:'{}'.".format(args.NET_TXT)
+        with open(os.path.join(self.log_dir, "config.txt"), "w") as fp:
+            fp.write("%s" % (str(args)))
+        
+        # create a  initial caption encoder object
+        caption_dir = pathlib.Path(args.data_dir)
+        embed_transform = EmbeddingFactory(args, caption_dir).get()
+        args.vocab_length = embed_transform.vocab_length
+        
+        # load network
+        netTXT = self.load_netTXT(args)
+        
+        file_names = []
+        embeddings = []
+        
+        # read captions and filenames
+        for caption_file in os.listdir(caption_dir):
+            with open(caption_dir / caption_file, "r") as fp:
+                captions = list(map(lambda cap: cap.lower().strip(), fp.readlines()))
+                if args.bulk:
+                    # caption_list.append(captions)
+                    file_names.append(caption_file.replace('.txt', '.jpg'))
+                    # run inference
+                    batch_enc_txt = self.run_inference(args, captions, embed_transform, netTXT)
+                    embeddings.append(batch_enc_txt.detach().cpu())
+                else:
+                    for caption in captions:
+                        file_names.append(caption_file.replace('.txt', '.jpg'))
+                        # run inference
+                        batch_enc_txt = self.run_inference(args, [caption], embed_transform, netTXT)
+                        embeddings.append(batch_enc_txt.detach().cpu())
+        
+        bulk = "bulk" if args.bulk else "no-bulk"
+        
+        file_name_pickle = os.path.join(self.image_dir, "filenames_{}_jemb.pickle".format(bulk))
+        with open(file_name_pickle, 'wb') as fpp:
+            pickle.dump(file_names, fpp)
+            print("'{}' is created with {} entries".format(file_name_pickle, len(file_names)))
+        
+        embedding_pickle = os.path.join(self.image_dir,
+                                        "embedding_{}_{}_{}_jemb.pickle".format(bulk, args.embedding_strategy,
+                                                                                args.emb_dim))
+        with open(embedding_pickle, 'wb') as fpp:
+            pickle.dump(embeddings, fpp)
+            print("'{}' is created with {} entries".format(embedding_pickle, len(file_names)))

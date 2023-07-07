@@ -4,7 +4,7 @@ python main.py --name "jointemb" \
 --class-name-file "../StackGAN-Pytorch/data/sixray_2381/train/classes.txt" \
 --label-csv "../StackGAN-Pytorch/data/sixray_2381/train/labels.csv" \
 --NET-TXT "output/pydsje_word_train_2023_07_07_13_29_32/Model/netTXT_epoch_230.pth" \
---vocabulary-txt "output/pydsje_word_train_2023_07_07_13_29_32/Model/vocabulary.txt" \
+--vocabulary-txt "output/pydsje_word_train_2023_07_07_13_29_32/Log/vocabulary.txt" \
 --drop-last \
 --emd-dim 1536 \
 --batch-size 128 \

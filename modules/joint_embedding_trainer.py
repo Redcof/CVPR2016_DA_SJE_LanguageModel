@@ -1,5 +1,6 @@
 import gc
 import os
+import pathlib
 import time
 
 import torch
@@ -11,6 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 from modules.HybridCNN import HybridCNN
 from modules.ImageEncoder import ImageEncoder
 from util.model_utils import mkdir_p, weights_init, save_model
+from util.text_encoder_interface import EmbeddingFactory
 
 
 class JointEmbeddingTrainer:
@@ -49,9 +51,9 @@ class JointEmbeddingTrainer:
         
         self.params = GlobalParam()
     
-    def load_netTXT(self, train_dataset, args):
+    def load_netTXT(self, args):
         # create models
-        netTXT = HybridCNN(train_dataset.vocab_length, args.emb_dim, dropout=args.dropout)
+        netTXT = HybridCNN(args.vocab_length, args.emb_dim, dropout=args.dropout)
         netTXT.apply(weights_init)
         netTXT.to(self.device)  # using accelerator
         return netTXT
@@ -176,7 +178,7 @@ class JointEmbeddingTrainer:
         
         # load network
         netIMG = self.load_netIMG(args)
-        netTXT = self.load_netTXT(data_loader.dataset, args)
+        netTXT = self.load_netTXT(args)
         
         generator_lr = args.lr_img
         discriminator_lr = args.lr_txt

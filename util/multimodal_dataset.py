@@ -51,8 +51,9 @@ class MultimodalDataset(Dataset):
         with open(self.label_file) as fp:
             self.labels = {k: v for k, v in map(lambda x: x.strip().split(','), fp.readlines())}
         assert len(self.image_files) == len(
-            self.caption_files), "The count of images and captions must be same, got {}!={}".format(len(self.image_files),
-                                                                                                    len(self.caption_files))
+            self.caption_files), "The count of images and captions must be same, got {}!={}".format(
+            len(self.image_files),
+            len(self.caption_files))
         if image_transform is None:
             image_transform = transforms.Compose([
                 transforms.Resize(img_dim),
@@ -61,10 +62,16 @@ class MultimodalDataset(Dataset):
             ])
         
         if caption_transform is None:
-            char_embedding = CharEmbedTransform(self.doc_length)
-            self.vocab_length = char_embedding.vocab_length
+            char_embedding_transform = CharEmbedTransform(self.doc_length)
+            self.vocab_length = char_embedding_transform.vocab_length
+            
+            def vocab_meta_setter_func(v, le):
+                self.vocab_length = le
+                self.vocabulary = v
+            
             caption_transform = transforms.Compose([
-                char_embedding
+                # char_embedding_transform,
+                transforms.Lambda(self._basic_char_encoder(self.doc_length, vocab_meta_setter_func)),
             ])
         
         if target_transform is None:
@@ -83,45 +90,53 @@ class MultimodalDataset(Dataset):
         except:
             return torch.tensor(-1)
     
-    # def _basic_char_encoder(self, caption):
-    #     """Must remove '\n' character. It currently supports ASCII characters"""
-    #     # lowercase
-    #     caption = caption.lower().strip()
-    #
-    #     def __get_index(word, space=True):
-    #         if space:
-    #             yield self.vocabulary.index(' ')
-    #         for char in list(word):
-    #             try:
-    #                 yield self.vocabulary.index(char)
-    #             except:
-    #                 yield 0
-    #
-    #     char_ids = []
-    #     # encode characters
-    #     [char_ids.extend(list(__get_index(list(char)))) for char in caption.split()]
-    #     char_ids = char_ids[1:]  # skip the first character as it is always 'space'
-    #
-    #     # truncate if the sentence is large
-    #     if len(char_ids) > self.doc_length:
-    #         char_ids = char_ids[:self.doc_length]
-    #
-    #     # place encoding into a tensor
-    #     char_encode = torch.zeros(self.doc_length, self.vocab_length)
-    #     for idx, char_code in enumerate(char_ids[1:]):
-    #         try:
-    #             char_encode[idx, char_code] = 1
-    #         except IndexError as e:
-    #             print("Error: CaptionL:", caption, len(caption), idx, char_code, len(char_ids), char_encode.shape)
-    #             raise e
-    #     return char_encode
-    #
+    @staticmethod
+    def _basic_char_encoder(doc_length, vocab_meta_setter_func):
+        """Must remove '\n' character. It currently supports ASCII characters"""
+        vocabulary = "\nabcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{} "
+        vocab_length = len(vocabulary)
+        vocab_meta_setter_func(vocabulary, vocab_length)
+        
+        def wrapper(caption):
+            # lowercase
+            caption = caption.lower().strip()
+            
+            def __get_index(word, space=True):
+                if space:
+                    yield vocabulary.index(' ')
+                for char in list(word):
+                    try:
+                        yield vocabulary.index(char)
+                    except:
+                        yield 0
+            
+            char_ids = []
+            # encode characters
+            [char_ids.extend(list(__get_index(list(char)))) for char in caption.split()]
+            char_ids = char_ids[1:]  # skip the first character as it is always 'space'
+            
+            # truncate if the sentence is large
+            if len(char_ids) > doc_length:
+                char_ids = char_ids[:doc_length]
+            
+            # place encoding into a tensor
+            char_encode = torch.zeros(doc_length, vocab_length)
+            for idx, char_code in enumerate(char_ids[1:]):
+                try:
+                    char_encode[idx, char_code] = 1
+                except IndexError as e:
+                    print("Error: Caption:", caption, len(caption), idx, char_code, len(char_ids), char_encode.shape)
+                    raise e
+            return char_encode
+        
+        return wrapper
+    
     def get_img(self, img_path) -> torch.Tensor:
         img = Image.open(img_path).convert('RGB')
         img = self.image_transform(img)
         return img
     
-    def get_caption_embedding(self, caption_path, ) -> str:
+    def get_caption_embedding(self, caption_path) -> str:
         with open(caption_path) as fp:
             captions = fp.readlines()
             captions_ix = random.randint(0, len(captions) - 1)

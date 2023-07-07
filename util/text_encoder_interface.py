@@ -1,21 +1,40 @@
+import os
 from abc import abstractmethod
 
 import torch
 from torchvision.transforms import transforms
+
+from util.model_utils import clean
 
 
 class EmbeddingFactory:
     EMBEDDING_STRATEGIES = ('char', 'word', 'word2vec', 'glove25', 'glove50', 'glove100', 'glove200', 'glove300',
                             'fasttext-en', 'fasttext')
     
-    def __init__(self, strategy, doc_length, **kwargs):
+    def __init__(self, args, caption_dir, **kwargs):
+        strategy, doc_length = args.embedding_strategy, args.doc_length
         assert strategy in EmbeddingFactory.EMBEDDING_STRATEGIES, "The allowed strategies are: {} but {} given".format(
             EmbeddingFactory.EMBEDDING_STRATEGIES, strategy
         )
-        if strategy == "char":
-            txt_embedding = CharEmbedTransform(doc_length)
-        elif strategy == "word":
-            txt_embedding = WordEmbedTransform(doc_length, **kwargs)
+        captions = []
+        if args.embedding_strategy in ('word', 'fasttext'):
+            caption_files = [os.path.join(caption_dir, file) for file in os.listdir(caption_dir) if
+                             file.endswith(".txt")]
+            for caption_file in caption_files:
+                with open(caption_file) as fp:
+                    captions.extend([clean(caption.lower().strip()) for caption in fp.readlines()])
+            
+            max_char_len = float("-Inf")
+            max_word_len = float("-Inf")
+            for caption in captions:
+                if len(caption) > max_char_len:
+                    max_char_len = len(caption)
+                if len(caption.strip().split()) > max_word_len:
+                    max_word_len = len(caption.strip().split())
+            print("Doc length(char):", max_char_len)
+            print("Doc length(word):", max_word_len)
+        if strategy == "word":
+            txt_embedding = WordEmbedTransform(doc_length, captions=captions)
         elif strategy == "word2vec":
             txt_embedding = Word2VecTransform(**kwargs)
         elif strategy == "glove25":
@@ -34,7 +53,13 @@ class EmbeddingFactory:
             txt_embedding = FasttextPretrainedTransform(**kwargs)
         elif strategy == "openai":
             txt_embedding = OpenAIGPTTransform(**kwargs)
+        else:
+            # default char embedding transform
+            txt_embedding = CharEmbedTransform(doc_length)
         self.txt_embedding_transform = txt_embedding
+    
+    def get(self):
+        return self.txt_embedding_transform
 
 
 class TextEncoderTransformInterface(torch.nn.Module):

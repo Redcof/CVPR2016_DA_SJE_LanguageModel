@@ -55,6 +55,8 @@ def parse_args():
                         help="Specify enable test phase. Default will train")
     parser.add_argument('--finetune', dest='finetune', default=False, action='store_true',
                         help="Specify enable test phase. Default will train")
+    parser.add_argument('--predict', dest='predict', default=False, action='store_true',
+                        help="Specify to generate text embedding")
     parser.add_argument('--NET-IMG', dest='NET_IMG', default='', help="Path to Image Encoder Network")
     parser.add_argument('--NET-TXT', dest='NET_TXT', default='', help="Path to Text Encoder Network")
     parser.add_argument('--cuda', dest='cuda', default=False, action='store_true',
@@ -72,7 +74,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    phase = "test" if args.test_phase else "train"
+    phase = "test" if args.test_phase else ("predict" if args.predict else "train")
     # prepare output directory
     now = datetime.datetime.now(dateutil.tz.tzlocal())
     timestamp = now.strftime('%Y_%m_%d_%H_%M_%S')
@@ -98,50 +100,40 @@ def main():
     num_gpus = len(gpus)
     batch_size = args.batch_size * num_gpus
     
-    # image transform
-    image_transform = transforms.Compose([
-        AspectResize(args.imgsize),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
-    # read all the captions
-    captions = []
-    if args.embedding_strategy in ('word', 'fasttext'):
+    if phase in ("train", "test"):
+        # read all the captions
+        captions = []
         dataset_path = pathlib.Path(args.data_dir)
         caption_dir = dataset_path / phase / "captions"
-        caption_files = [os.path.join(caption_dir, file) for file in os.listdir(caption_dir) if
-                         file.endswith(".txt")]
-        for caption_file in caption_files:
-            with open(caption_file) as fp:
-                captions.extend([caption.lower().strip() for caption in fp.readlines()])
         
-        max_char_len = float("-Inf")
-        max_word_len = float("-Inf")
-        for caption in captions:
-            if len(caption) > max_char_len:
-                max_char_len = len(caption)
-            if len(caption.strip().split()) > max_word_len:
-                max_word_len = len(caption.strip().split())
-        print("Max char length:", max_char_len)
-        print("Max word length:", max_word_len)
-    
-    # create a caption initial encoder object
-    embed_transform = EmbeddingFactory(args.embedding_strategy, args.doc_length, captions=captions)
-    caption_transform = transforms.Compose([
-        embed_transform.txt_embedding_transform,
-    ])
-    
-    # load dataset
-    train_dataset = MultimodalDataset(args.data_dir, args.classnames, args.label_csv, args.doc_length, args.imgsize,
-                                      split=phase,
-                                      image_transform=image_transform,
-                                      caption_transform=caption_transform)
-    train_dataset.vocab_length = embed_transform.txt_embedding_transform.vocab_length
-    train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, drop_last=args.drop_last,
-                                  shuffle=True, num_workers=int(args.workers))
-    
-    trainer = JointEmbeddingTrainer(output_dir, args)
-    trainer.train(train_dataloader, args)
+        # create a caption initial encoder object
+        embed_transform = EmbeddingFactory(args, caption_dir).get()
+        # set vocab length
+        args.vocab_length = embed_transform.vocab_length
+        args.vocabulary = embed_transform.vocabulary
+        caption_transform = transforms.Compose([
+            embed_transform,
+        ])
+        # image transform
+        image_transform = transforms.Compose([
+            AspectResize(args.imgsize),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+        
+        # load dataset
+        train_dataset = MultimodalDataset(args.data_dir, args.classnames, args.label_csv, args.doc_length, args.imgsize,
+                                          split=phase,
+                                          image_transform=image_transform,
+                                          caption_transform=caption_transform)
+        train_dataloader = DataLoader(dataset=train_dataset, batch_size=batch_size, drop_last=args.drop_last,
+                                      shuffle=True, num_workers=int(args.workers))
+        
+        trainer = JointEmbeddingTrainer(output_dir, args)
+        trainer.train(train_dataloader, args)
+    elif phase == "predict":
+        trainer = JointEmbeddingTrainer(output_dir, args)
+        trainer.predict(args)
 
 
 if __name__ == '__main__':

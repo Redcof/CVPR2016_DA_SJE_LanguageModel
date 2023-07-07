@@ -174,6 +174,9 @@ class JointEmbeddingTrainer:
     def train(self, data_loader, args, test_dataset=None):
         with open(os.path.join(self.log_dir, "config.txt"), "w") as fp:
             args.batch_count = len(data_loader)
+            with open(os.path.join(self.log_dir, "vocabulary.txt"), "w") as fp2:
+                fp2.writelines(map(lambda x: "%s\n" % x, args.vocabulary))
+                del args.vocabulary
             fp.write("%s" % (str(args)))
         
         # load network

@@ -10,6 +10,6 @@ python main.py --name "jointemb" \
 --doc-length 350 \
 --embedding-strategy char \
 --predict \
---bulk
+--bulk 4
 
 

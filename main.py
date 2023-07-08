@@ -105,6 +105,11 @@ def main():
     num_gpus = len(gpus)
     batch_size = args.batch_size * num_gpus
     
+    MINIMUM_DOCLEN = 70
+    if args.doc_length < MINIMUM_DOCLEN:
+        # to protect CNN_RNN network from throwing dimension error
+        args.doc_length = MINIMUM_DOCLEN
+    
     if phase in ("train", "test"):
         # read all the captions
         captions = []

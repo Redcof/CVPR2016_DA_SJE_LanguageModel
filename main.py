@@ -57,9 +57,10 @@ def parse_args():
                         help="Specify enable test phase. Default will train")
     parser.add_argument('--predict', dest='predict', default=False, action='store_true',
                         help="Specify to generate text embedding")
-    parser.add_argument('--bulk', dest='bulk', default=False, action='store_true',
-                        help="Used during inference. Caption file contains multiple captions. This flag indicates "
-                             "if we want to generate embedding as a bulk per file or not.")
+    parser.add_argument('--bulk', dest='bulk', default=0, type=int,
+                        help="Used during inference. Caption file contains multiple captions. This value indicates "
+                             "if we want to generate embedding as a bulk per file or not. Specifying less than 2 "
+                             "will be considered as single caption.")
     parser.add_argument('--vocabulary-txt', dest='vocabulary_txt', type=str, help="A file that contains the vocabulary")
     parser.add_argument('--NET-IMG', dest='NET_IMG', default='', help="Path to Image Encoder Network")
     parser.add_argument('--NET-TXT', dest='NET_TXT', default='', help="Path to Text Encoder Network")

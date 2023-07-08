@@ -317,7 +317,7 @@ class JointEmbeddingTrainer:
             batch_txt[idx, :, :] = embed_transform(caption)
         batch_txt.to(self.device)
         batch_enc_txt = netTXT(batch_txt)
-        return batch_enc_txt
+        return batch_enc_txt.detach().cpu().numpy()
     
     def predict(self, args):
         assert os.path.isfile(args.NET_TXT), "A valid pretrained path to text " \
@@ -340,18 +340,23 @@ class JointEmbeddingTrainer:
         for caption_file in os.listdir(caption_dir):
             with open(caption_dir / caption_file, "r") as fp:
                 captions = list(map(lambda cap: cap.lower().strip(), fp.readlines()))
-                if args.bulk:
+                filename = os.path.join("train/JPEGImages", caption_file.replace('.txt', '.jpg'))
+                if args.bulk >= 1:
+                    if len(captions) > args.bulk:
+                        captions = captions[:args.bulk]
+                    elif len(captions) < args.bulk:
+                        continue
                     # caption_list.append(captions)
-                    file_names.append(caption_file.replace('.txt', '.jpg'))
+                    file_names.append(filename)
                     # run inference
                     batch_enc_txt = self.run_inference(args, captions, embed_transform, netTXT)
-                    embeddings.append(batch_enc_txt.detach().cpu())
+                    embeddings.append(batch_enc_txt)
                 else:
                     for caption in captions:
-                        file_names.append(caption_file.replace('.txt', '.jpg'))
+                        file_names.append(filename)
                         # run inference
                         batch_enc_txt = self.run_inference(args, [caption], embed_transform, netTXT)
-                        embeddings.append(batch_enc_txt.detach().cpu())
+                        embeddings.append(batch_enc_txt)
         
         bulk = "bulk" if args.bulk else "no-bulk"
         
@@ -363,6 +368,25 @@ class JointEmbeddingTrainer:
         embedding_pickle = os.path.join(self.image_dir,
                                         "embedding_{}_{}_{}_jemb.pickle".format(bulk, args.embedding_strategy,
                                                                                 args.emb_dim))
+        with open(embedding_pickle, 'wb') as fpp:
+            pickle.dump(embeddings, fpp)
+            print("'{}' is created with {} entries".format(embedding_pickle, len(file_names)))
+        
+        test_captions = [
+            "Bag contains a gun.",
+            "A gun in the center.",
+            "A knife in the center.",
+            "Bag contains a gun.",
+            "A gun in the center.",
+            "A knife in the center.",
+        ]
+        embeddings = []
+        # run inference
+        batch_enc_txt = self.run_inference(args, test_captions, embed_transform, netTXT)
+        embeddings.append(batch_enc_txt)
+        embedding_pickle = os.path.join(self.image_dir,
+                                        "embedding_test_{}_{}_{}_jemb.pickle".format(bulk, args.embedding_strategy,
+                                                                                     args.emb_dim))
         with open(embedding_pickle, 'wb') as fpp:
             pickle.dump(embeddings, fpp)
             print("'{}' is created with {} entries".format(embedding_pickle, len(file_names)))

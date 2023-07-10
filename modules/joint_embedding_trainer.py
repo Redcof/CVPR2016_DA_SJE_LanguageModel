@@ -318,8 +318,8 @@ class JointEmbeddingTrainer:
         self.summary_writer.close()
     
     def embed_one(self, args, embed_transform, netTXT, caption):
-        batch_enc_txt = self.run_inference(args, [caption], embed_transform, netTXT)
-        return batch_enc_txt.detach().cpu().numpy()[0]
+        np_batch_of1_enc = self.run_inference(args, [caption], embed_transform, netTXT)
+        return np_batch_of1_enc[0]
     
     def run_inference(self, args, captions, embed_transform, netTXT):
         batch_txt = torch.Tensor(len(captions), args.doc_length, args.vocab_length)
@@ -359,14 +359,14 @@ class JointEmbeddingTrainer:
                     # caption_list.append(captions)
                     file_names.append(filename)
                     # run inference
-                    batch_enc_txt = self.run_inference(args, captions, embed_transform, netTXT)
-                    embeddings.append(batch_enc_txt)
+                    np_batch_enc_txt = self.run_inference(args, captions, embed_transform, netTXT)
+                    embeddings.append(np_batch_enc_txt)
                 else:
                     for caption in captions:
                         file_names.append(filename)
                         # run inference
-                        batch_enc_txt = self.run_inference(args, [caption], embed_transform, netTXT)
-                        embeddings.append(batch_enc_txt)
+                        np_batch_enc_txt = self.run_inference(args, [caption], embed_transform, netTXT)
+                        embeddings.append(np_batch_enc_txt)
         
         bulk = "bulk" if args.bulk else "no-bulk"
         
@@ -393,8 +393,8 @@ class JointEmbeddingTrainer:
         embeddings = []
         # run inference
         for caption in test_captions:
-            batch_enc_txt = self.embed_one(args, embed_transform, netTXT, caption)
-            embeddings.append(batch_enc_txt)
+            np_batch_enc_txt = self.embed_one(args, embed_transform, netTXT, caption)
+            embeddings.append(np_batch_enc_txt)
         embedding_pickle = os.path.join(self.image_dir,
                                         "embedding_test_{}_{}_{}_jemb.pickle".format(bulk, args.embedding_strategy,
                                                                                      args.emb_dim))

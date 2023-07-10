@@ -388,8 +388,9 @@ class JointEmbeddingTrainer:
         ]
         embeddings = []
         # run inference
-        batch_enc_txt = self.run_inference(args, test_captions, embed_transform, netTXT)
-        embeddings.append(batch_enc_txt)
+        for caption in test_captions:
+            batch_enc_txt = self.run_inference(args, [caption], embed_transform, netTXT)
+            embeddings.append(batch_enc_txt)
         embedding_pickle = os.path.join(self.image_dir,
                                         "embedding_test_{}_{}_{}_jemb.pickle".format(bulk, args.embedding_strategy,
                                                                                      args.emb_dim))

@@ -27,7 +27,9 @@ def parse_args():
     parser.add_argument('--label-csv', dest='label_csv', type=str, required=True,
                         help="A csv file that contains filename and label name ")
     # optional
-    parser.add_argument('--snapshot-interval', dest='snapshot_interval', type=int, default=5)
+    parser.add_argument('--snapshot-interval', dest='snapshot_interval', type=str, default="best",
+                        help="It accepts 'number' or 'best'. best:Save models whenever find it best model."
+                             "number: A epoch interval on which the models will be saved")
     parser.add_argument('--embedding-strategy', dest='embedding_strategy', type=str, default='char',
                         choices=('char', 'word', 'word2vec', 'glove25', 'glove50', 'glove100', 'glove200', 'glove300',
                                  'fasttext-en', 'fasttext'),
@@ -88,7 +90,6 @@ def main():
     repo = Repo(project_root)
     args.git_checksum = repo.git.rev_parse("HEAD")  # save commit checksum
     output_dir = 'output/%s_%s_%s_%s' % (args.name, args.embedding_strategy, phase, timestamp)
-    print("Output:", output_dir)
     # set random seeds
     if args.manualSeed is None:
         args.manualSeed = 47

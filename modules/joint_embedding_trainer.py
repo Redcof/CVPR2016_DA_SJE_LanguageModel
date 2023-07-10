@@ -25,10 +25,15 @@ class JointEmbeddingTrainer:
         mkdir_p(self.model_dir)
         mkdir_p(self.image_dir)
         mkdir_p(self.log_dir)
+        print("Output:", output_dir)
         self.summary_writer = SummaryWriter(self.log_dir)
         
         self.max_epoch = cfg.max_epoch
-        self.snapshot_interval = cfg.snapshot_interval
+        if cfg.snapshot_interval == 'best':
+            self.save_best = True
+        else:
+            self.save_best = False
+            self.snapshot_interval = int(cfg.snapshot_interval)
         
         s_gpus = cfg.gpu_id.split(',')
         self.gpus = [int(ix) for ix in s_gpus]
@@ -215,6 +220,8 @@ class JointEmbeddingTrainer:
             netIMG, optimizerIMG, netTXT, optimizerTXT, data_loader = self.accelerator.prepare(netIMG, optimizerIMG,
                                                                                                netTXT, optimizerTXT,
                                                                                                data_loader)
+        lowest_loss = float("+inf")
+        save_model_now = False
         for epoch in range(epoch_start, self.max_epoch):
             start_t = time.time()
             # # LR decay for Optimizers
@@ -225,7 +232,8 @@ class JointEmbeddingTrainer:
             #     discriminator_lr *= 0.5
             #     for param_group in optimizerTXT.param_groups:
             #         param_group['lr'] = discriminator_lr
-            
+            # #########################
+            # ###### EPOCH START ######
             loop_ran = False
             for batch_idx, (txt_batch, img_batch, label_batch) in enumerate(data_loader, 0):
                 loop_ran = True
@@ -265,19 +273,12 @@ class JointEmbeddingTrainer:
                 count = count + 1
                 if batch_idx % 100 == 0:
                     self.summary_writer.add_scalar('loss@step', joint_loss.data, count)
-                if (epoch % self.snapshot_interval == 0 or epoch == self.max_epoch - 1) and batch_idx % 100 == 0:
-                    # save the image result for each epoch
-                    # save_img_results(None, lr_fake, epoch, self.image_dir)
-                    ###########################
-                    # GENERATE TEST IMAGES
-                    ###########################
-                    # self.test(netIMG, test_dataset.embeddings, self.image_dir, epoch)
-                    ...
                 print("\rEpoch: {}/{} Batch: {}/{} Loss: {} Memory(GB): {} ".format(
                     epoch + 1, self.max_epoch, batch_idx + 1, len(data_loader),
                     round(joint_loss.data.item(), 4), round(torch.cuda.memory_allocated() / 1e9, 4)
                 ), end="\b")
-            
+            # #########################
+            # ###### EPOCH END ########
             if loop_ran is False:
                 raise Warning(
                     "Not enough data available.\n"
@@ -291,8 +292,13 @@ class JointEmbeddingTrainer:
             print('\n[%d/%d] loss: %.4f Total Time: %.2fsec'
                   % (epoch, self.max_epoch, joint_loss.data.item(), (end_t - start_t)))
             
-            if epoch % self.snapshot_interval == 0:
+            # check model performance
+            if joint_loss.data.item() < lowest_loss:
+                lowest_loss = joint_loss.data.item()
+                save_model_now = True
+            if (self.save_best and save_model_now) or (epoch % self.snapshot_interval == 0):
                 save_model(netIMG, netTXT, epoch, self.model_dir)
+                save_model_now = False
             self.summary_writer.add_scalar('loss@epoch', joint_loss.data, epoch)
             # CLEAN GPU RAM  ########################
             del joint_loss

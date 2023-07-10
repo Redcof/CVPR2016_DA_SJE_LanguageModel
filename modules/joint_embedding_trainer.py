@@ -5,7 +5,6 @@ import pickle
 import time
 
 import torch
-from accelerate import Accelerator
 from torch import optim, Tensor
 from torch.backends import cudnn
 from torch.utils.tensorboard import SummaryWriter
@@ -39,10 +38,11 @@ class JointEmbeddingTrainer:
         self.gpus = [int(ix) for ix in s_gpus]
         self.num_gpus = len(self.gpus)
         self.batch_size = cfg.batch_size * self.num_gpus
-        torch.cuda.set_device(self.gpus[0])
+        # torch.cuda.set_device(self.gpus[0])
         cudnn.benchmark = True
         
         if accelerate:
+            from accelerate import Accelerator
             self.accelerator = Accelerator()
             self.device = self.accelerator.device
             print("Running using Accelerator.")
@@ -317,6 +317,10 @@ class JointEmbeddingTrainer:
         self.summary_writer.flush()
         self.summary_writer.close()
     
+    def embed_one(self, args, embed_transform, netTXT, caption):
+        batch_enc_txt = self.run_inference(args, [caption], embed_transform, netTXT)
+        return batch_enc_txt.detach().cpu().numpy()[0]
+    
     def run_inference(self, args, captions, embed_transform, netTXT):
         batch_txt = torch.Tensor(len(captions), args.doc_length, args.vocab_length)
         for idx, caption in enumerate(captions):
@@ -389,7 +393,7 @@ class JointEmbeddingTrainer:
         embeddings = []
         # run inference
         for caption in test_captions:
-            batch_enc_txt = self.run_inference(args, [caption], embed_transform, netTXT)
+            batch_enc_txt = self.embed_one(args, embed_transform, netTXT, caption)
             embeddings.append(batch_enc_txt)
         embedding_pickle = os.path.join(self.image_dir,
                                         "embedding_test_{}_{}_{}_jemb.pickle".format(bulk, args.embedding_strategy,
